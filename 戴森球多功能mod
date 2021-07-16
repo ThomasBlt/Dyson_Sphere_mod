@@ -81,7 +81,8 @@ namespace SimpleUI
         private static bool uninfinitething=false;
         private static bool DisplayingstarWindow = false;
         private static bool changequicktp = false;
-
+        private static int[][] tpplanet;
+        private static Dictionary<int, int[]> planetDictionary=new Dictionary<int, int[]>();
         private Vector2 scrollPosition;
         // 窗口开关
         public static bool DisplayingWindow = false;
@@ -156,6 +157,21 @@ namespace SimpleUI
             {
                 DisplayingWindow = !DisplayingWindow;
                 Debug.Log("按下了快捷键1");
+                planetDictionary=new Dictionary<int, int[]>();
+                if (GameMain.galaxy != null && GameMain.galaxy.stars != null)
+                {
+                    int k = 1;
+                    foreach (StarData sd in GameMain.galaxy.stars)
+                    {
+                        int i = 1;
+                        foreach (PlanetData pd in sd.planets)
+                        {
+                            planetDictionary.Add(pd.id, new int[2] { k, i });
+                            i++;
+                        }
+                        k++;
+                    }
+                }
             }
         }
 
@@ -168,6 +184,14 @@ namespace SimpleUI
                 windowRect1 = GUI.Window(20210218, windowRect1, DoMyWindow1, "简易窗口");
                 xl_SimpleUI_1_x_config.Value = xl_SimpleUI_1_x;
                 xl_SimpleUI_1_y_config.Value = xl_SimpleUI_1_y;
+                if(xl_SimpleUI_1_x<0|| xl_SimpleUI_1_x > 1920)
+                {
+                    xl_SimpleUI_1_x_config.Value = 1080;
+                }
+                if(xl_SimpleUI_1_y<0|| xl_SimpleUI_1_y > 1080)
+                {
+                    xl_SimpleUI_1_y_config.Value = 77;
+                }
                 if (DisplayingstarWindow)
                 {
                     Rect windowRect2 = new Rect(xl_SimpleUI_2_x, xl_SimpleUI_2_y, xl_SimpleUI_2_width, xl_SimpleUI_2_height);
@@ -175,6 +199,14 @@ namespace SimpleUI
                     windowRect2 = GUI.Window(20210219, windowRect2, DoMyWindow2, "星际旅行");
                     xl_SimpleUI_2_x_config.Value = xl_SimpleUI_2_x;
                     xl_SimpleUI_2_y_config.Value = xl_SimpleUI_2_y;
+                    if (xl_SimpleUI_2_x < 0 || xl_SimpleUI_2_x > 1920)
+                    {
+                        xl_SimpleUI_2_x_config.Value = 448;
+                    }
+                    if (xl_SimpleUI_2_y < 0 || xl_SimpleUI_2_y > 1080)
+                    {
+                        xl_SimpleUI_2_y_config.Value = 199;
+                    }
                 }
 
             }
@@ -391,35 +423,42 @@ namespace SimpleUI
                 }
             }
             GUILayout.EndArea();
-            GUILayout.BeginArea(new Rect(200, 120, 200, 580));
             GUILayout.Label("其它星系:");
-            if(navplanetlist!=null && navplanetlist.Count > 0)
+            if (navplanetlist != null && navplanetlist.Count > 0)
             {
-                int pindex = 0;
-                foreach (int i in navplanetlist)
+                int[] temp = navplanetlist.ToArray();
+                int tempwidth = 170;
+                for(int j = 0; j < navplanetlist.Count/10+1; j++)
                 {
-                    if (t != null && t.Count >= 0 && t.Contains(i))
+                    GUILayout.BeginArea(new Rect(tempwidth, 120, 150, 580));
+                    GUILayout.BeginVertical();
+                    int itop = j * 10 + 10;
+                    for (int i=j * 10;i < temp.Length && i<itop;i++)
                     {
-                        continue;
+                        if (GameMain.data == null)
+                        {
+                            break;
+                        }
+                        PlanetData tempplanet = GameMain.data.galaxy.PlanetById(temp[i]);
+                        if (t != null && t.Count >= 0 && t.Contains(temp[i])|| tempplanet == null)
+                        {
+                            itop++;
+                            continue;
+                        }
+                        
+                        if (GUILayout.Button(tempplanet.displayName, new[] { GUILayout.Height(40), GUILayout.Width(150) }))
+                        {
+                            focusPlanet = tempplanet;
+                            fly = true;
+                        }
                     }
-                    if (GameMain.data == null)
-                    {
-                        break;
-                    }
-                    PlanetData tempplanet = GameMain.data.galaxy.PlanetById(i);
-                    if (GUILayout.Button(tempplanet.displayName, new[] { GUILayout.Height(40), GUILayout.Width(150) }))
-                    {
-                        focusPlanet = tempplanet;
-                        fly = true;
-                    }
-                    if (pindex++ > 10)
-                    {
-                        break;
-                    }
+                    tempwidth += 150;
+                    GUILayout.EndVertical();
+                    GUILayout.EndArea();
                 }
+                
             }
-            
-            GUILayout.EndArea();
+
 
             GUILayout.EndVertical();
 
@@ -433,7 +472,7 @@ namespace SimpleUI
                 {
                     DisplayingstarWindow = !DisplayingstarWindow;
                 }
-                
+
             }
 
             GUILayout.EndArea();
@@ -479,7 +518,6 @@ namespace SimpleUI
                     GUILayout.BeginHorizontal();
                     for (int i = windowi * 5; i < navplanetlist.Count && i < (windowi + 1) * 5; i++)
                     {
-
                         if (GUILayout.Button(GameMain.galaxy.PlanetById(navplanetlist[i]).name, new[] { GUILayout.Height(40), GUILayout.Width(150) }))
                         {
                             if (changequicktp)
@@ -511,37 +549,43 @@ namespace SimpleUI
 
             height += 40;
             tempheight = 0;
-            scrollPosition = GUI.BeginScrollView(new Rect(0, height, 800, 920-height), scrollPosition, new Rect(0, 0, 750, 2000), true, true);
-            for (int windowi = 0; windowi < planetidlist.Count / 5 + 1; windowi++)
+            scrollPosition = GUI.BeginScrollView(new Rect(0, height, 800, 920-height), scrollPosition, new Rect(0, 0, 800, 2000), true, true);
+            if(GameMain.galaxy!=null && GameMain.galaxy.stars != null)
             {
-                GUILayout.BeginArea(new Rect(10 , tempheight, 780, 40));
-                GUILayout.BeginHorizontal();
-                for (int i = windowi * 5; i < planetidlist.Count && i < (windowi + 1) * 5; i++)
+                foreach (StarData sd in GameMain.galaxy.stars)
                 {
-                    if (GUILayout.Button(GameMain.galaxy.PlanetById(planetidlist[i]).name, new[] { GUILayout.Height(40), GUILayout.Width(150) }))
+                    GUILayout.BeginArea(new Rect(10, tempheight, 150, 50));
+                    GUILayout.Label(sd.displayName);
+                    GUILayout.EndArea();
+                    GUILayout.BeginArea(new Rect(160, tempheight, 900, 50));
+                    GUILayout.BeginHorizontal();
+                    foreach (PlanetData pd in sd.planets)
                     {
-                        if (!navplanetlist.Contains(planetidlist[i])&&navplanetlist.Count<10)
+                        if (!navplanetlist.Contains(pd.id) )
                         {
-                            if (changequicktp)
+                            int[] temp = planetDictionary[pd.id];
+                            if (GUILayout.Button(temp[1].ToString(), new[] { GUILayout.Height(50), GUILayout.Width(50) }))
                             {
-                                navplanetlist.Add(planetidlist[i]);
-                                navplanetlist.Sort();
-                                navplanet.Value = string.Join(";", navplanetlist.ToArray());
-                                planetidlist.RemoveAt(i);
-                            }
-                            else
-                            {
-                                focusPlanet = GameMain.galaxy.PlanetById(planetidlist[i]);
-                                fly = true;
+                                if (changequicktp && navplanetlist.Count < 20)
+                                {
+                                    navplanetlist.Add(pd.id);
+                                    navplanetlist.Sort();
+                                    navplanet.Value = string.Join(";", navplanetlist.ToArray());
+                                }
+                                else if(!changequicktp)
+                                {
+                                    focusPlanet = pd;
+                                    fly = true;
+                                }
                             }
                         }
                     }
+                    GUILayout.EndHorizontal();
+                    GUILayout.EndArea();
+                    tempheight += 50;
                 }
-
-                GUILayout.EndHorizontal();
-                GUILayout.EndArea();
-                tempheight += 40;
             }
+
 
             //if (GameMain.mainPlayer.planetData == null)
             //{
