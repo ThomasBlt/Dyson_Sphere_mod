@@ -1,0 +1,820 @@
+using System;
+using System.Text.RegularExpressions;
+using System.ComponentModel;
+using BepInEx;
+using BepInEx.Configuration;
+using UnityEngine;
+using HarmonyLib;
+using System.Collections.Generic;
+
+namespace SimpleUI
+{
+    [BepInPlugin(GUID, NAME, VERSION)]
+    [BepInProcess(GAME_PROCESS)]
+    public class SimpleUI : BaseUnityPlugin
+    {
+        public static PlanetData focusPlanet;
+        public static bool fly = false;
+        public const string GUID = "cn.blacksnipe.dsp.SimpleUI";
+        public const string NAME = "简易UI示例";
+        public const string VERSION = "1.0";
+        private const string GAME_PROCESS = "DSPGAME.exe";
+        // 默认值
+        public static float multiple = 1;
+        public static float multiplebeltspeed = 1;
+        public string stackmultiple1 = "";
+        public string multipelsmelt1 = "";
+        private int planetid = 0;
+      
+        private float xl_SimpleUI_1_x;
+        private float xl_SimpleUI_1_y;
+        private float xl_SimpleUI_1_x_move;
+        private float xl_SimpleUI_1_y_move;
+        private float xl_SimpleUI_1_width ;
+        private float xl_SimpleUI_1_height;
+
+        private float xl_SimpleUI_2_x;
+        private float xl_SimpleUI_2_y;
+        private float xl_SimpleUI_2_x_move;
+        private float xl_SimpleUI_2_y_move;
+        private float xl_SimpleUI_2_width;
+        private float xl_SimpleUI_2_height;
+
+        private float tempx1;
+        private float tempy1;
+        private float tempx2;
+        private float tempy2;
+        private static float curTime;
+        private static float lastTime;
+        private bool moveWindow1;
+        private bool moveWindow2;
+
+        private float walkspeed;
+        private float tempwalkspeed;
+        private bool firstwalkspeed = false;
+        private float techspeed;
+        private float temptechspeed;
+        private bool firsttechspeed = false;
+        private static ConfigEntry<int> MULTIPELSMELT;
+        private static ConfigEntry<int> StackMultiple;
+        private static ConfigEntry<float> xl_SimpleUI_1_x_config;
+        private static ConfigEntry<float> xl_SimpleUI_1_y_config;
+        private static ConfigEntry<float> xl_SimpleUI_2_x_config;
+        private static ConfigEntry<float> xl_SimpleUI_2_y_config;
+        private static ConfigEntry<Boolean> allhandcraft;
+        private static ConfigEntry<Boolean> nomaterials;
+        private static ConfigEntry<Boolean> quickproduce;
+        private static ConfigEntry<Boolean> allrecipe;
+        private static ConfigEntry<Boolean> noneedwarp;
+        private static ConfigEntry<Boolean> autonavigation ;
+        private static ConfigEntry<Boolean> autowarpcommand;
+        private static ConfigEntry<Boolean> Infinitething ;
+        private static ConfigEntry<Boolean> Infiniteplayerpower;
+        private static ConfigEntry<string> navplanet;
+        private static bool first = true;
+        private List<RecipeProto> list = new List<RecipeProto>();
+        private List<ItemProto> temp1 = new List<ItemProto>();
+        private List<int> planetidlist = new List<int>();
+        private static List<int> navplanetlist = new List<int>();
+        private static bool ready = false;
+        private static bool unlockalltechdone=false;
+        private static bool uninfinitething=false;
+        private static bool DisplayingstarWindow = false;
+        private static bool changequicktp = false;
+
+        private Vector2 scrollPosition;
+        // 窗口开关
+        public static bool DisplayingWindow = false;
+        // 启动按键
+        private ConfigEntry<KeyboardShortcut> ShowCounter1 { get; set; }
+
+        void Start()
+        {
+            new Harmony(GUID).PatchAll();
+            scrollPosition[0] = 0;
+            scrollPosition[1] = 0;
+            lastTime = Time.time;
+
+            xl_SimpleUI_1_x_move = 710;
+            xl_SimpleUI_1_y_move = 390;
+            xl_SimpleUI_1_width = 1000;
+            xl_SimpleUI_1_height = 700;
+            tempx1 = xl_SimpleUI_1_x;
+            tempy1 = xl_SimpleUI_1_y;
+
+            xl_SimpleUI_2_x_move = 710;
+            xl_SimpleUI_2_y_move = 390;
+            xl_SimpleUI_2_width = 820;
+            xl_SimpleUI_2_height = 900;
+            tempx2 = xl_SimpleUI_2_x;
+            tempy2 = xl_SimpleUI_2_y;
+
+            moveWindow1 = false;
+            moveWindow2 = false;
+            allhandcraft = Config.Bind("全部手搓", "allhandcraft", false);
+            nomaterials = Config.Bind("无材料生产", "nomaterials", false);
+            quickproduce = Config.Bind("快速生产", "quickproduce", false);
+            allrecipe = Config.Bind("解锁全部配方", "allrecipe", false);
+            noneedwarp = Config.Bind("无翘曲器曲速", "noneedwarp", false);
+            autonavigation = Config.Bind("自动导航", "autonavigation", false);
+            autowarpcommand = Config.Bind("自动使用翘曲器", "autowarpcommand", false);
+            navplanet = Config.Bind("传送星球", "navplanet", "");
+            Infinitething = Config.Bind("无限物品", "Infinitething", false);
+            Infiniteplayerpower = Config.Bind("无限物品", "Infiniteplayerpower", false);
+            StackMultiple = Config.Bind("堆叠倍数", "StackMultiple", 1);
+            MULTIPELSMELT = Config.Bind("冶炼倍数", "mutiplesmelt", 1);
+            xl_SimpleUI_1_x_config = Config.Bind("第一窗口x", "xl_SimpleUI_1_x_config", 448.0f);
+            xl_SimpleUI_1_y_config = Config.Bind("第一窗口y", "xl_SimpleUI_1_y_config", 199.0f);
+            xl_SimpleUI_2_x_config = Config.Bind("全部星系图x", "xl_SimpleUI_2_x_config", 1080.0f);
+            xl_SimpleUI_2_y_config = Config.Bind("全部星系图y", "xl_SimpleUI_2_y_config", 77.0f);
+
+            xl_SimpleUI_1_x = xl_SimpleUI_1_x_config.Value;
+            xl_SimpleUI_1_y = xl_SimpleUI_1_y_config.Value;
+            xl_SimpleUI_2_x = xl_SimpleUI_2_x_config.Value;
+            xl_SimpleUI_2_y = xl_SimpleUI_2_y_config.Value;
+
+            if (navplanet!=null && navplanet.Value.Length > 0)
+            {
+                foreach (string t in navplanet.Value.Split(';'))
+                {
+                    navplanetlist.Add(int.Parse(t));
+                }
+            }
+            
+            stackmultiple1 = StackMultiple.Value.ToString();
+            multipelsmelt1 = MULTIPELSMELT.Value.ToString();
+            ShowCounter1 = Config.Bind("打开窗口快捷键", "Key", new BepInEx.Configuration.KeyboardShortcut(KeyCode.F9));
+        }
+
+        void Update()
+        {
+            curTime = Time.time;
+            RecipeCustomization();
+
+            // 监听脚本按键按下
+            if (ShowCounter1.Value.IsDown())
+            {
+                DisplayingWindow = !DisplayingWindow;
+                Debug.Log("按下了快捷键1");
+            }
+        }
+
+        private void OnGUI()
+        {
+            if (DisplayingWindow)
+            {
+                Rect windowRect1 = new Rect(xl_SimpleUI_1_x, xl_SimpleUI_1_y, xl_SimpleUI_1_width, xl_SimpleUI_1_height);
+                moveWindow_xl_first(ref xl_SimpleUI_1_x,ref xl_SimpleUI_1_y,ref xl_SimpleUI_1_x_move,ref xl_SimpleUI_1_y_move,ref moveWindow1,ref tempx1,ref tempy1, xl_SimpleUI_1_width);
+                windowRect1 = GUI.Window(20210218, windowRect1, DoMyWindow1, "简易窗口");
+                xl_SimpleUI_1_x_config.Value = xl_SimpleUI_1_x;
+                xl_SimpleUI_1_y_config.Value = xl_SimpleUI_1_y;
+                if (DisplayingstarWindow)
+                {
+                    Rect windowRect2 = new Rect(xl_SimpleUI_2_x, xl_SimpleUI_2_y, xl_SimpleUI_2_width, xl_SimpleUI_2_height);
+                    moveWindow_xl_first(ref xl_SimpleUI_2_x, ref xl_SimpleUI_2_y, ref xl_SimpleUI_2_x_move, ref xl_SimpleUI_2_y_move, ref moveWindow2, ref tempx2, ref tempy2, xl_SimpleUI_2_width);
+                    windowRect2 = GUI.Window(20210219, windowRect2, DoMyWindow2, "星际旅行");
+                    xl_SimpleUI_2_x_config.Value = xl_SimpleUI_2_x;
+                    xl_SimpleUI_2_y_config.Value = xl_SimpleUI_2_y;
+                }
+
+            }
+            if (fly)
+            {
+                if (GUI.Button(new Rect(10, 50, 150, 50), "停止飞行"))
+                {
+                    fly = false;
+                }
+            }
+        }
+        public void moveWindow_xl_first(ref float x,ref float y,ref float x_move,ref float y_move,ref bool movewindow,ref float tempx,ref float tempy,float x_width)
+        {
+            Vector2 temp = Input.mousePosition;
+            if (temp.x > x && temp.x < x + x_width && 1080 - temp.y > y && 1080 - temp.y < y + 20)
+            {
+                if (Input.GetMouseButton(0))
+                {
+                    if (!movewindow)
+                    {
+                        x_move = x;
+                        y_move = y;
+                        tempx = temp.x;
+                        tempy = 1080 - temp.y;
+                    }
+                    movewindow = true;
+                    x = x_move + temp.x - tempx;
+                    y = y_move + (1080 - temp.y) - tempy;
+                }
+                else
+                {
+                    movewindow = false;
+                    tempx = x;
+                    tempy = y;
+                }
+            }else if (movewindow)
+            {
+                movewindow = false;
+                x = x_move + temp.x - tempx;
+                y = y_move + (1080 - temp.y) - tempy;
+            }
+        }
+       
+        public void DoMyWindow1(int winId)
+        {
+            GUILayout.BeginArea(new Rect(10, 20, 790, 700));
+            {
+                GUILayout.BeginHorizontal();
+
+                GUILayout.BeginArea(new Rect(10, 50,790, 500));
+
+                multiple = GUI.HorizontalSlider(new Rect(10, 10, 120, 30), multiple, 1, 100);
+                GUI.Label(new Rect(10, 30, 120, 30), "新采矿机速度倍率:" + (int)multiple);
+                techspeed = GUI.HorizontalSlider(new Rect(150, 10, 120, 30), techspeed, 1, 200);
+                GUI.Label(new Rect(150, 30, 120, 30), "研究速度倍率:" + (int)techspeed);
+                walkspeed = GUI.HorizontalSlider(new Rect(290, 10, 120, 30), walkspeed, 1, 100);
+                GUI.Label(new Rect(290, 30, 120, 30), "走路速度倍率:" + (int)walkspeed);
+
+                GUILayout.EndArea();
+
+                GUILayout.BeginArea(new Rect(10, 150, 790, 30));
+                    GUILayout.Label("以下设置需要进入存档");
+                GUILayout.EndArea();
+
+                GUILayout.BeginArea(new Rect(10, 180, 790, 200));
+                GUILayout.BeginHorizontal();
+                {
+                    if (GUILayout.Button("清空背包", new[] { GUILayout.Height(40), GUILayout.Width(100) }))
+                    {
+                        for (int i = 0; i < GameMain.mainPlayer.package.grids.Length; i++)
+                        {
+                            GameMain.mainPlayer.package.grids[i].count = 0;
+                        }
+                        GameMain.mainPlayer.package.Sort();
+                    }
+                    if (GUILayout.Button("增加背包容量", new[] { GUILayout.Height(40), GUILayout.Width(100) }))
+                    {
+                        if (GameMain.mainPlayer != null)
+                        {
+                            if (GameMain.mainPlayer.package.size < 200)
+                            {
+                                GameMain.mainPlayer.package.SetSize(GameMain.mainPlayer.package.size + 10);
+                            }
+                        }
+                    }
+                    if (GUILayout.Button("解锁全部科技", new[] { GUILayout.Height(40), GUILayout.Width(100) }))
+                    {
+                        if (GameMain.mainPlayer != null && !unlockalltechdone)
+                        {
+                            foreach (TechProto tp in new List<TechProto>(LDB._techs.dataArray))
+                            {
+                                if (tp.ID == 2106 || tp.ID == 2407 || tp.ID == 2506 || tp.ID == 2606 || tp.ID == 3208 || tp.ID == 3407 || tp.ID == 3508 || tp.ID == 3606 || tp.ID == 3904
+                                    ) continue;
+                                if (!GameMain.history.techStates[tp.ID].unlocked)
+                                {
+                                    GameMain.history.UnlockTech(tp.ID);
+                                }
+                            }
+                            unlockalltechdone = true;
+                        }
+                    }
+                    
+                    GUILayout.EndHorizontal();
+
+                    noneedwarp.Value = GUI.Toggle(new Rect(0, 50, 150, 30), noneedwarp.Value, "无需翘曲器曲速飞行");
+                    Infinitething.Value = GUI.Toggle(new Rect(0, 80, 150, 30), Infinitething.Value, "无限物品");
+                    Infiniteplayerpower.Value = GUI.Toggle(new Rect(0, 110, 150, 30), Infiniteplayerpower.Value, "无限机甲能量");
+                    GUILayout.EndHorizontal();
+                    if (GameMain.history != null)
+                    {
+                        if (!firsttechspeed)
+                        {
+                            firsttechspeed = true;
+                            techspeed = GameMain.history.techSpeed;
+                            temptechspeed = techspeed;
+                        }
+                        if (temptechspeed != techspeed)
+                        {
+                            GameMain.history.techSpeed = (int)techspeed;
+                            temptechspeed = techspeed;
+                        }
+                        else if (GameMain.history.techSpeed > techspeed)
+                        {
+                            techspeed = GameMain.history.techSpeed;
+                        }
+                        else
+                        {
+                            GameMain.history.techSpeed = (int)techspeed;
+                        }
+                    }
+                        if (GameMain.mainPlayer != null)
+                    {
+                        if (!firstwalkspeed)
+                        {
+                            firstwalkspeed = true;
+                            walkspeed = GameMain.mainPlayer.mecha.walkSpeed;
+                            tempwalkspeed = walkspeed;
+                        }
+                        if (tempwalkspeed != walkspeed)
+                        {
+                            GameMain.mainPlayer.mecha.walkSpeed = walkspeed;
+                            tempwalkspeed = walkspeed;
+                        }
+                        else if (GameMain.mainPlayer.mecha.walkSpeed > walkspeed)
+                        {
+                            walkspeed = GameMain.mainPlayer.mecha.walkSpeed;
+                        }
+                        else
+                        {
+                            GameMain.mainPlayer.mecha.walkSpeed = walkspeed;
+                        }
+
+                    }
+
+                }
+                GUILayout.EndArea();
+
+                GUILayout.BeginArea(new Rect(10, 380, 790, 200));
+                {
+                        GUILayout.Label("以下设置需要重启游戏");
+                        GUILayout.BeginHorizontal();
+                        multipelsmelt1 = Regex.Replace(GUILayout.TextField(multipelsmelt1, 10, new[] { GUILayout.Height(30), GUILayout.Width(50) }), @"[^0-9]", "");
+                        if (GUILayout.Button("设置冶炼倍数",new[] { GUILayout.Height(40), GUILayout.Width(100) }))
+                        {
+                            MULTIPELSMELT.Value = int.Parse(multipelsmelt1);
+                        }
+                        stackmultiple1 = GUILayout.TextField(stackmultiple1, 10, new[] { GUILayout.Height(30), GUILayout.Width(50) });
+                        stackmultiple1 = Regex.Replace(stackmultiple1, @"[^0-9]", "");
+                        if (GUILayout.Button("设置堆叠倍率", new[] { GUILayout.Height(40), GUILayout.Width(100) }))
+                        {
+                            StackMultiple.Value = int.Parse(stackmultiple1);
+                        }
+                        GUILayout.BeginVertical();
+                        allhandcraft.Value = GUI.Toggle(new Rect(0, 80, 100, 30), allhandcraft.Value, "全部手搓");
+                        nomaterials.Value = GUI.Toggle(new Rect(0, 110, 100, 30), nomaterials.Value, "无材料生产");
+                        quickproduce.Value = GUI.Toggle(new Rect(0, 140, 100, 30), quickproduce.Value, "快速生产");
+                        allrecipe.Value = GUI.Toggle(new Rect(0, 170, 100, 30), allrecipe.Value, "配方全解锁");
+                        GUILayout.EndVertical();
+
+                    GUILayout.EndHorizontal();
+                        
+                    }
+
+                GUILayout.EndArea();
+                
+                    
+                
+            }
+            
+            GUILayout.EndArea();
+            GUILayout.BeginArea(new Rect(500, 20, 500, 700));
+            GUILayout.BeginVertical();
+            GUILayout.Label("星际旅行");
+            autonavigation.Value = GUI.Toggle(new Rect(0, 50, 150, 30), autonavigation.Value, "自动导航");
+            autowarpcommand.Value = GUI.Toggle(new Rect(0, 80, 150, 30), autowarpcommand.Value, "自动使用翘曲器");
+
+            GUILayout.BeginArea(new Rect(0, 120, 200, 580));
+            GUILayout.Label("当前星系:");
+            List<int> t = new List<int>();
+
+            if (GameMain.localStar != null)
+            {
+                foreach (PlanetData i in GameMain.localStar.planets)
+                {
+                    if (!t.Contains(i.id))
+                    {
+                        t.Add(i.id);
+                    }
+                    if (GUILayout.Button(i.displayName, new[] { GUILayout.Height(40), GUILayout.Width(150) }))
+                    {
+                        focusPlanet = i;
+                        fly = true;
+                    }
+                }
+            }
+            GUILayout.EndArea();
+            GUILayout.BeginArea(new Rect(200, 120, 200, 580));
+            GUILayout.Label("其它星系:");
+            if(navplanetlist!=null && navplanetlist.Count > 0)
+            {
+                int pindex = 0;
+                foreach (int i in navplanetlist)
+                {
+                    if (t != null && t.Count >= 0 && t.Contains(i))
+                    {
+                        continue;
+                    }
+                    if (GameMain.data == null)
+                    {
+                        break;
+                    }
+                    PlanetData tempplanet = GameMain.data.galaxy.PlanetById(i);
+                    if (GUILayout.Button(tempplanet.displayName, new[] { GUILayout.Height(40), GUILayout.Width(150) }))
+                    {
+                        focusPlanet = tempplanet;
+                        fly = true;
+                    }
+                    if (pindex++ > 10)
+                    {
+                        break;
+                    }
+                }
+            }
+            
+            GUILayout.EndArea();
+
+            GUILayout.EndVertical();
+
+
+            GUILayout.EndArea();
+
+            GUILayout.BeginArea(new Rect(700, 20, 200, 700));
+            if (GUILayout.Button("全部星球", new[] { GUILayout.Height(40), GUILayout.Width(150) }))
+            {
+                if (GameMain.galaxy != null)
+                {
+                    DisplayingstarWindow = !DisplayingstarWindow;
+                }
+                
+            }
+
+            GUILayout.EndArea();
+        }
+
+        public void DoMyWindow2(int winId)
+        {
+            float height = 20;
+            if (planetidlist.Count <= 0)
+            {
+                foreach (StarData sd in GameMain.galaxy.stars)
+                {
+                    foreach (PlanetData pd in sd.planets)
+                    {
+                        if (curTime - lastTime >= 3)
+                        {
+                            lastTime = curTime;
+                        }
+                        if (!planetidlist.Contains(pd.id) && !navplanetlist.Contains(pd.id))
+                        {
+                            planetidlist.Add(pd.id);
+                        }
+                    }
+                }
+            }
+            GUILayout.BeginArea(new Rect(10, height, 790, 40));
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("当前tp面板");
+            changequicktp = GUI.Toggle(new Rect(100, 0, 200, 30), changequicktp, "更改快速tp栏星球");
+            GUILayout.EndHorizontal();
+            GUILayout.EndArea();
+            height += 40;
+            GUILayout.BeginArea(new Rect(10, height, 790, 40));
+            GUILayout.Label("快速tp栏");
+            GUILayout.EndArea();
+            float tempheight = height;
+            if (navplanetlist != null && navplanetlist.Count > 0)
+            {
+                for (int windowi = 0; windowi < navplanetlist.Count / 5 + 1; windowi++)
+                {
+                    tempheight += 40;
+                    GUILayout.BeginArea(new Rect(10, tempheight, 790, 40));
+                    GUILayout.BeginHorizontal();
+                    for (int i = windowi * 5; i < navplanetlist.Count && i < (windowi + 1) * 5; i++)
+                    {
+
+                        if (GUILayout.Button(GameMain.galaxy.PlanetById(navplanetlist[i]).name, new[] { GUILayout.Height(40), GUILayout.Width(150) }))
+                        {
+                            if (changequicktp)
+                            {
+                                planetidlist.Add(navplanetlist[i]);
+                                planetidlist.Sort();
+                                navplanetlist.RemoveAt(i);
+                                navplanetlist.Sort();
+                                navplanet.Value = string.Join(";", navplanetlist.ToArray());
+                            }
+                            else
+                            {
+                                focusPlanet = GameMain.galaxy.PlanetById(navplanetlist[i]);
+                                fly = true;
+                            }
+                        }
+                    }
+                    GUILayout.EndHorizontal();
+                    GUILayout.EndArea();
+                }
+            }
+            height += tempheight;
+
+            GUILayout.BeginArea(new Rect(10, height, 790, 40));
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("剩余tp星球");
+            GUILayout.EndHorizontal();
+            GUILayout.EndArea();
+
+            height += 40;
+            tempheight = 0;
+            scrollPosition = GUI.BeginScrollView(new Rect(0, height, 800, 920-height), scrollPosition, new Rect(0, 0, 750, 2000), true, true);
+            for (int windowi = 0; windowi < planetidlist.Count / 5 + 1; windowi++)
+            {
+                GUILayout.BeginArea(new Rect(10 , tempheight, 780, 40));
+                GUILayout.BeginHorizontal();
+                for (int i = windowi * 5; i < planetidlist.Count && i < (windowi + 1) * 5; i++)
+                {
+                    if (GUILayout.Button(GameMain.galaxy.PlanetById(planetidlist[i]).name, new[] { GUILayout.Height(40), GUILayout.Width(150) }))
+                    {
+                        if (!navplanetlist.Contains(planetidlist[i])&&navplanetlist.Count<10)
+                        {
+                            if (changequicktp)
+                            {
+                                navplanetlist.Add(planetidlist[i]);
+                                navplanetlist.Sort();
+                                navplanet.Value = string.Join(";", navplanetlist.ToArray());
+                                planetidlist.RemoveAt(i);
+                            }
+                            else
+                            {
+                                focusPlanet = GameMain.galaxy.PlanetById(planetidlist[i]);
+                                fly = true;
+                            }
+                        }
+                    }
+                }
+
+                GUILayout.EndHorizontal();
+                GUILayout.EndArea();
+                tempheight += 40;
+            }
+
+            //if (GameMain.mainPlayer.planetData == null)
+            //{
+            //    GameMain.mainPlayer.uPosition = GameMain.galaxy.PlanetById(planetid).uPosition;
+            //    GameMain.mainPlayer.uVelocity = new VectorLF3(0, 0, 0);
+            //}
+            
+            GUI.EndScrollView();
+
+        }
+
+
+        void RecipeCustomization()
+        {
+            if (first && LDB._recipes != null)
+            {
+                List<RecipeProto> temp = new List<RecipeProto>(LDB._recipes.dataArray);
+                temp1 = new List<ItemProto>(LDB._items.dataArray);
+                List<TechProto> temp2 = new List<TechProto>(LDB._techs.dataArray);
+                List<StringProto> temp3 = new List<StringProto>(LDB._strings.dataArray);
+                //冶炼设施倍率
+                for (int i = 0; i < temp.Count; ++i)
+                {
+                    if (temp[i].Type == ERecipeType.Smelt)
+                    {
+                        for (int j = 0; j < temp[i].ItemCounts.Length; ++j)
+                            temp[i].ItemCounts[j] *= MULTIPELSMELT.Value;
+                        for (int j = 0; j < temp[i].ResultCounts.Length; ++j)
+                            temp[i].ResultCounts[j] *= MULTIPELSMELT.Value;
+                    }
+                }
+                //新配方设置
+                //{
+                //    RecipeProto rp = new RecipeProto();
+                //    rp.ID = 999;
+                //    rp.name = "GreenTech";
+                //    rp.Type = ERecipeType.Assemble;
+                //    rp.Handcraft = true;
+                //    rp.Explicit = true;
+                //    rp.TimeSpend = 60;
+                //    rp.Items = new int[1] { 6005 };
+                //    rp.ItemCounts = new int[1] { 2 };
+                //    rp.Results = new int[2] { 1209, 1305 };
+                //    rp.ResultCounts = new int[2] { 10, 1 };
+                //    rp.GridIndex = 1609;
+                //    list.Add(rp);
+
+                //    temp.AddRange(list);
+                //    LDB._recipes.dataArray = temp.ToArray();
+                //    LDB._recipes.OnAfterDeserialize();
+                //}
+                
+
+                first = false;
+                ready = true;
+                //配方信息查询
+                foreach(RecipeProto rp in temp)
+                {
+                    if (allhandcraft.Value)
+                    {
+                        rp.Handcraft = true;
+                    }
+                    
+                    if (nomaterials.Value)
+                    {
+                        rp.ItemCounts = new int[rp.ItemCounts.Length];
+                        for (int i = 0; i < rp.ItemCounts.Length; i++)
+                        {
+                            rp.ItemCounts[i] = 0;
+                        }
+                    }
+                    if (quickproduce.Value)
+                    {
+                        rp.TimeSpend = 1;
+                    }
+                    //获取配方数据
+                    {
+                        //string itemstr = "";
+                        //string itemcountstr = "";
+                        //string resultstr = "";
+                        //string resultcount = "";
+                        //foreach (int i in rp.Items)
+                        //{
+                        //    itemstr = itemstr + i + " ";
+                        //}
+                        //foreach (int i in rp.ItemCounts)
+                        //{
+
+                        //    itemcountstr = itemcountstr + i + " ";
+                        //}
+                        //foreach (int i in rp.Results)
+                        //{
+                        //    resultstr = resultstr + i + " ";
+                        //}
+                        //foreach (int i in rp.ResultCounts)
+                        //{
+                        //    resultcount = resultcount + i + " ";
+                        //}
+                        //Logger.LogInfo(rp.ID + "," + rp.name + "," + rp.Type + "," + rp.Name + "," + rp.Handcraft + "," + rp.Explicit + ","
+                        //    + rp.TimeSpend + ";" + itemstr + ";" + itemcountstr + ";" + resultstr + ";" + resultcount + ";" + rp.GridIndex);
+                    }
+                    
+                }
+                
+                foreach (ItemProto ip in temp1)
+                {
+                    ip.StackSize *= StackMultiple.Value;
+                    //string t = ip.Description + ";" + ip.ID + ";" + ip.GridIndex + ";" +ip.HeatValue+";"+ip.Potential+";"+ip.StackSize;
+                    //Logger.LogInfo(t);
+                }
+
+            }
+            if (ready && GameMain.history != null)
+            {
+                foreach (RecipeProto rp in list)
+                {
+                    GameMain.history.UnlockRecipe(rp.ID);
+                }
+                if (allrecipe.Value)
+                {
+                    foreach (RecipeProto rp in new List<RecipeProto>(LDB._recipes.dataArray))
+                    {
+                        GameMain.history.UnlockRecipe(rp.ID);
+                    }
+                }
+                if (Infinitething.Value)
+                {
+                    if (!uninfinitething)
+                    {
+                        if (GameMain.mainPlayer.package.grids.Length < temp1.Count)
+                        {
+                            GameMain.mainPlayer.package.SetSize((temp1.Count/10+1) * 10);
+                        }
+                        uninfinitething = true;
+                    }
+                    StorageComponent.GRID[] grids = GameMain.mainPlayer.package.grids;
+
+                    int i = 0;
+                    foreach (ItemProto ip in temp1)
+                    {
+                        grids[i].itemId = ip.ID;
+                        grids[i].count = ip.StackSize;
+                        i++;
+                        if (i >= grids.Length) break;
+                    }
+                    
+                    GameMain.mainPlayer.SetSandCount(1000000);
+                }
+                if (GameMain.galaxy != null)
+                {
+                    //foreach(StarData sd in GameMain.galaxy.stars)
+                    //{
+                    //    foreach(PlanetData pd in sd.planets)
+                    //    {
+                    //        Logger.LogInfo(pd.name + " "+ pd.id+" " + pd.uPosition);
+                    //    }
+                    //}
+                }
+                if (planetid == 0 &&GameMain.mainPlayer.planetData!=null)
+                {
+                    planetid = GameMain.mainPlayer.planetId;
+                }
+                if (Infiniteplayerpower.Value)
+                {
+                    GameMain.mainPlayer.mecha.coreEnergy = GameMain.mainPlayer.mecha.coreEnergyCap;
+                }
+                if (GameMain.mainPlayer.package.size > 200)
+                {
+                    GameMain.mainPlayer.package.size = 200;
+                    
+                }
+                
+            }
+        
+        
+        }
+        //新采矿机的效率
+        [HarmonyPatch(typeof(FactorySystem), "NewMinerComponent")]
+        class NewMinerComponentPatch
+        {
+            static void Postfix(FactorySystem __instance, int __result)
+            {
+                __instance.minerPool[__result].speed *= (int)multiple;
+            }
+            
+        }
+        //无翘曲器曲速
+        [HarmonyPatch(typeof(Mecha), "UseWarper")]
+        class EnoughWarperPatch
+        {
+            static void Postfix(ref bool __result)
+            {
+                if (noneedwarp.Value)
+                {
+                    __result = true;
+                }
+            }
+
+        }
+        
+        //关闭窗口快捷键
+        [HarmonyPatch(typeof(UIGame), "On_E_Switch")]
+        class CloseWindowPatch
+        {
+            
+            public static bool Prefix(ref UIGame __instance)
+            {
+                if (DisplayingWindow)
+                {
+                    DisplayingWindow = !DisplayingWindow;
+                    return false;
+                }
+                return true;
+            }
+        }
+
+        //星图方向指引启动自动导航
+        [HarmonyPatch(typeof(UIStarmap), "OnCursorFunction3Click")]
+        class AutonavigationPatch
+        {
+            public static void Prefix(UIStarmap __instance)
+            {
+                if (__instance.focusPlanet.planet != null && autonavigation.Value)
+                {
+                    focusPlanet = __instance.focusPlanet.planet;
+                    navplanetlist.Add(focusPlanet.id);
+                    navplanetlist.Sort();
+                    navplanet.Value = string.Join(";", navplanetlist.ToArray());
+                    fly = true;
+                }
+            }
+        }
+        
+        //操纵人物
+        [HarmonyPatch(typeof(PlayerController), "GetInput")]
+        class PlayerOperation 
+        {
+            public static float t = 20.0f;
+            public static void Postfix(PlayerController __instance)
+            {
+                if (fly&&!__instance.player.sailing && focusPlanet!=GameMain.mainPlayer.planetData)
+                {
+                    __instance.input0.z = 1;
+                    __instance.input1.y+=1;
+                    if (__instance.actionFly.currentAltitude > 49)
+                    {
+                        if (__instance.horzSpeed <12.5)
+                        {
+                            __instance.velocity = (focusPlanet.uPosition - __instance.player.uPosition).normalized * t++;
+                        }
+                    }
+                }else if (fly && __instance.player.sailing)
+                {
+                    __instance.player.uVelocity = (focusPlanet.uPosition - __instance.player.uPosition).normalized*__instance.actionSail.maxSailSpeed;
+                    if(__instance.player.planetData!=null && __instance.player.planetData == focusPlanet)
+                    {
+                        fly = false;
+                        t = 20.0f;
+                    }
+                    if (__instance.player.warping)
+                    {
+                        double distance = (__instance.player.uPosition - focusPlanet.uPosition).magnitude;
+                        if (distance < 5000)
+                        {
+                            __instance.player.warpCommand = false ;
+                        }
+                    }
+                    if(__instance.player.planetData==null&&autowarpcommand.Value && !__instance.player.warping && __instance.player.mecha.UseWarper()&& (__instance.player.uPosition - focusPlanet.uPosition).magnitude > 5000)
+                    {
+                        __instance.player.warpCommand = true;
+                    }
+                }
+            }
+        }
+    }
+}
