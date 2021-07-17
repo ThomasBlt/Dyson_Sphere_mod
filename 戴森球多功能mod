@@ -75,6 +75,7 @@ namespace SimpleUI
         private List<RecipeProto> list = new List<RecipeProto>();
         private List<ItemProto> temp1 = new List<ItemProto>();
         private List<int> planetidlist = new List<int>();
+        private float planetlistheight = 2500;
         private static List<int> navplanetlist = new List<int>();
         private static bool ready = false;
         private static bool unlockalltechdone=false;
@@ -171,6 +172,7 @@ namespace SimpleUI
                         }
                         k++;
                     }
+                    planetlistheight = k * 50 + 50;
                 }
             }
         }
@@ -423,14 +425,16 @@ namespace SimpleUI
                 }
             }
             GUILayout.EndArea();
+            GUILayout.BeginArea(new Rect(170, 120, 200, 25));
             GUILayout.Label("其它星系:");
+            GUILayout.EndArea();
             if (navplanetlist != null && navplanetlist.Count > 0)
             {
                 int[] temp = navplanetlist.ToArray();
                 int tempwidth = 170;
                 for(int j = 0; j < navplanetlist.Count/10+1; j++)
                 {
-                    GUILayout.BeginArea(new Rect(tempwidth, 120, 150, 580));
+                    GUILayout.BeginArea(new Rect(tempwidth, 145, 150, 580));
                     GUILayout.BeginVertical();
                     int itop = j * 10 + 10;
                     for (int i=j * 10;i < temp.Length && i<itop;i++)
@@ -468,7 +472,7 @@ namespace SimpleUI
             GUILayout.BeginArea(new Rect(700, 20, 200, 700));
             if (GUILayout.Button("全部星球", new[] { GUILayout.Height(40), GUILayout.Width(150) }))
             {
-                if (GameMain.galaxy != null)
+                if (GameMain.galaxy != null && GameMain.galaxy.stars!=null)
                 {
                     DisplayingstarWindow = !DisplayingstarWindow;
                 }
@@ -518,22 +522,27 @@ namespace SimpleUI
                     GUILayout.BeginHorizontal();
                     for (int i = windowi * 5; i < navplanetlist.Count && i < (windowi + 1) * 5; i++)
                     {
-                        if (GUILayout.Button(GameMain.galaxy.PlanetById(navplanetlist[i]).name, new[] { GUILayout.Height(40), GUILayout.Width(150) }))
+                        PlanetData planet = GameMain.galaxy.PlanetById(navplanetlist[i]);
+                        if (planet != null)
                         {
-                            if (changequicktp)
+                            if (GUILayout.Button(planet.name, new[] { GUILayout.Height(40), GUILayout.Width(150) }))
                             {
-                                planetidlist.Add(navplanetlist[i]);
-                                planetidlist.Sort();
-                                navplanetlist.RemoveAt(i);
-                                navplanetlist.Sort();
-                                navplanet.Value = string.Join(";", navplanetlist.ToArray());
-                            }
-                            else
-                            {
-                                focusPlanet = GameMain.galaxy.PlanetById(navplanetlist[i]);
-                                fly = true;
+                                if (changequicktp)
+                                {
+                                    planetidlist.Add(navplanetlist[i]);
+                                    planetidlist.Sort();
+                                    navplanetlist.RemoveAt(i);
+                                    navplanetlist.Sort();
+                                    navplanet.Value = string.Join(";", navplanetlist.ToArray());
+                                }
+                                else
+                                {
+                                    focusPlanet = GameMain.galaxy.PlanetById(navplanetlist[i]);
+                                    fly = true;
+                                }
                             }
                         }
+                        
                     }
                     GUILayout.EndHorizontal();
                     GUILayout.EndArea();
@@ -549,9 +558,10 @@ namespace SimpleUI
 
             height += 40;
             tempheight = 0;
-            scrollPosition = GUI.BeginScrollView(new Rect(0, height, 800, 920-height), scrollPosition, new Rect(0, 0, 800, 2000), true, true);
-            if(GameMain.galaxy!=null && GameMain.galaxy.stars != null)
+            scrollPosition = GUI.BeginScrollView(new Rect(0, height, 800, 920 - height), scrollPosition, new Rect(0, 0, 800, planetlistheight), true, true);
+            if (GameMain.galaxy != null && GameMain.galaxy.stars != null)
             {
+                int i = 0;
                 foreach (StarData sd in GameMain.galaxy.stars)
                 {
                     GUILayout.BeginArea(new Rect(10, tempheight, 150, 50));
@@ -561,7 +571,7 @@ namespace SimpleUI
                     GUILayout.BeginHorizontal();
                     foreach (PlanetData pd in sd.planets)
                     {
-                        if (!navplanetlist.Contains(pd.id) )
+                        if (!navplanetlist.Contains(pd.id))
                         {
                             int[] temp = planetDictionary[pd.id];
                             if (GUILayout.Button(temp[1].ToString(), new[] { GUILayout.Height(50), GUILayout.Width(50) }))
@@ -572,7 +582,7 @@ namespace SimpleUI
                                     navplanetlist.Sort();
                                     navplanet.Value = string.Join(";", navplanetlist.ToArray());
                                 }
-                                else if(!changequicktp)
+                                else if (!changequicktp)
                                 {
                                     focusPlanet = pd;
                                     fly = true;
@@ -587,12 +597,6 @@ namespace SimpleUI
             }
 
 
-            //if (GameMain.mainPlayer.planetData == null)
-            //{
-            //    GameMain.mainPlayer.uPosition = GameMain.galaxy.PlanetById(planetid).uPosition;
-            //    GameMain.mainPlayer.uVelocity = new VectorLF3(0, 0, 0);
-            //}
-            
             GUI.EndScrollView();
 
         }
